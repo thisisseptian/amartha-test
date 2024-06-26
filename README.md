@@ -47,7 +47,7 @@ amartha-test/
 
 ## Flow
 
-To test the flow, you can use Postman to hit the endpoints in the following order:
+To test the flow, you can use Postman collection (in folder collection) to hit the endpoints in the following order:
 ```sh
 1. Hit Loan Create
     - Requires borrower_id, principal_amount, and interest_rate
@@ -67,7 +67,7 @@ To test the flow, you can use Postman to hit the endpoints in the following orde
     - The borrower must sign the organizer-borrower agreement URL for the loan status to change to loan disbursed
 ```
 
-Note that I have also created several APIs to assist with debugging, mostly for getting lists and details:
+Note: I have also created several APIs to assist in debugging, mostly for getting lists and details:
 ```sh
 1. Loan List
 2. Loan Detail
@@ -77,5 +77,5 @@ Note that I have also created several APIs to assist with debugging, mostly for 
 
 ## Dependencies
 
-To facilitate PDF creation, this repository uses the `gofpdf` package. Alternatively, you could use `wkhtmltopdf`, but it would take longer since you need to design the HTML first.
+To facilitate PDF creation, this repository uses the `gofpdf` package. Alternatively, we could use `wkhtmltopdf`, but it would take longer since i need to design the HTML first.
 
