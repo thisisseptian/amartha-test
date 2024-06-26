@@ -77,5 +77,5 @@ Note that I have also created several APIs to assist with debugging, mostly for 
 
 ## Dependencies
 
-To facilitate PDF creation, this repository uses the gofpdf package. Alternatively, you could use wkhtmltopdf, but it would take longer since you need to design the HTML first.
+To facilitate PDF creation, this repository uses the `gofpdf` package. Alternatively, you could use `wkhtmltopdf`, but it would take longer since you need to design the HTML first.
 
