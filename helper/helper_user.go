@@ -22,7 +22,7 @@ func GenerateIncrementalUserID() int64 {
 }
 
 func InitUsers() {
-	var borrower1, lender1, lender2, fieldOfficer1 model.User
+	var borrower1, lender1, lender2, fieldValidator1, fieldOfficer1 model.User
 
 	borrower1 = model.User{
 		UserID:   GenerateIncrementalUserID(),
@@ -42,15 +42,22 @@ func InitUsers() {
 		UserType: constant.UserTypeLender,
 	}
 
+	fieldValidator1 = model.User{
+		UserID:   GenerateIncrementalUserID(),
+		UserName: "Validator",
+		UserType: constant.UserTypeFieldValidatorEmployee,
+	}
+
 	fieldOfficer1 = model.User{
 		UserID:   GenerateIncrementalUserID(),
-		UserName: "Amartha Officer",
-		UserType: constant.UserTypeEmployee,
+		UserName: "Officer",
+		UserType: constant.UserTypeFieldOfficerEmployee,
 	}
 
 	users[borrower1.UserID] = &borrower1
 	users[lender1.UserID] = &lender1
 	users[lender2.UserID] = &lender2
+	users[fieldValidator1.UserID] = &fieldValidator1
 	users[fieldOfficer1.UserID] = &fieldOfficer1
 }
 

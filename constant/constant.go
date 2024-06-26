@@ -1,9 +1,12 @@
 package constant
 
+const AgreementPrefix = "http://localhost:8080/agreement/%d/view"
+
 const (
-	UserTypeBorrower = 1
-	UserTypeLender   = 2
-	UserTypeEmployee = 3
+	UserTypeBorrower               = 1
+	UserTypeLender                 = 2
+	UserTypeFieldValidatorEmployee = 3
+	UserTypeFieldOfficerEmployee   = 4
 )
 
 const (

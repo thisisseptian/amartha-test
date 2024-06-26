@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"amartha-test/constant"
 	"amartha-test/helper"
@@ -93,6 +95,28 @@ func ListLoan(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(loans)
 }
 
+// DetailLoan ...
+func DetailLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
+	// 1. check http method
+	if r.Method != http.MethodGet {
+		log.Println("[DetailLoan] invalid request method")
+		http.Error(w, "invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 2. get loan by loan id
+	loan := helper.GetLoanByLoanID(loanID)
+	if loan.LoanID == 0 {
+		log.Println("[DetailLoan] loan data is not found")
+		http.Error(w, "loan data is not found", http.StatusNotFound)
+		return
+	}
+
+	// 3. return response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(loan)
+}
+
 // ApproveLoan ...
 func ApproveLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 	// 1. check http method
@@ -122,24 +146,19 @@ func ApproveLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 		http.Error(w, "field validator employee id is empty", http.StatusBadRequest)
 		return
 	}
-	if approvalInfo.ApprovalDate.IsZero() {
-		log.Print("[ApproveLoan] approval date is invalid")
-		http.Error(w, "approval date is invalid", http.StatusBadRequest)
-		return
-	}
 
 	// 4. get loan by loan id
 	loan := helper.GetLoanByLoanID(loanID)
 	if loan.LoanID == 0 {
-		log.Println("[ApproveLoan] loan data not found")
-		http.Error(w, "loan data not found", http.StatusBadRequest)
+		log.Println("[ApproveLoan] loan data is not found")
+		http.Error(w, "loan data is not found", http.StatusBadRequest)
 		return
 	}
 
 	// 5. check loan status
-	if loan.LoanID != constant.LoanStatusProposed {
-		log.Printf("[ApproveLoan] loan status invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status))
-		http.Error(w, "loan status invalid", http.StatusBadRequest)
+	if loan.Status != constant.LoanStatusProposed {
+		log.Printf("[ApproveLoan] loan status is invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status))
+		http.Error(w, fmt.Sprintf("[ApproveLoan] loan status is invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status)), http.StatusBadRequest)
 		return
 	}
 
@@ -151,8 +170,8 @@ func ApproveLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 		return
 	}
 
-	// 7. check user status
-	if fieldValidatorEmployee.UserType != constant.UserTypeEmployee {
+	// 7. check user type
+	if fieldValidatorEmployee.UserType != constant.UserTypeFieldValidatorEmployee {
 		log.Println("[ApproveLoan] user type is not field validator employee")
 		http.Error(w, "user type is not field validator employee", http.StatusBadRequest)
 		return
@@ -166,6 +185,11 @@ func ApproveLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 		FieldValidatorEmployeeID: approvalInfo.FieldValidatorEmployeeID,
 		ApprovalDate:             approvalInfo.ApprovalDate,
 	}
+	approvalDate := approvalInfo.ApprovalDate
+	if approvalInfo.ApprovalDate.IsZero() {
+		approvalDate = time.Now()
+	}
+	loan.ApprovalInfo.ApprovalDate = approvalDate
 	helper.UpsertLoan(loan)
 
 	// 9. return response
@@ -183,8 +207,8 @@ func InvestLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 	}
 
 	// 2. decode body
-	var approvalInfo model.ApprovalInfo
-	err := json.NewDecoder(r.Body).Decode(&approvalInfo)
+	var lending model.Lending
+	err := json.NewDecoder(r.Body).Decode(&lending)
 	if err != nil {
 		log.Printf("[InvestLoan] fail decode body with error: %+v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -192,19 +216,14 @@ func InvestLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 	}
 
 	// 3. sanitize payload
-	if approvalInfo.PictureProof == "" {
-		log.Print("[InvestLoan] picture proof is empty")
-		http.Error(w, "picture proof is empty", http.StatusBadRequest)
+	if lending.LenderID == 0 {
+		log.Print("[InvestLoan] lender id is empty")
+		http.Error(w, "lender id is empty", http.StatusBadRequest)
 		return
 	}
-	if approvalInfo.FieldValidatorEmployeeID == 0 {
-		log.Print("[InvestLoan] field validator employee id is empty")
-		http.Error(w, "field validator employee id is empty", http.StatusBadRequest)
-		return
-	}
-	if approvalInfo.ApprovalDate.IsZero() {
-		log.Print("[InvestLoan] approval date is invalid")
-		http.Error(w, "approval date is invalid", http.StatusBadRequest)
+	if lending.InvestedAmount == 0 {
+		log.Print("[InvestLoan] invested amount is empty")
+		http.Error(w, "invested amount is empty", http.StatusBadRequest)
 		return
 	}
 
@@ -217,38 +236,71 @@ func InvestLoan(w http.ResponseWriter, r *http.Request, loanID int64) {
 	}
 
 	// 5. check loan status
-	if loan.LoanID != constant.LoanStatusProposed {
+	if loan.Status != constant.LoanStatusApproved {
 		log.Printf("[InvestLoan] loan status invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status))
-		http.Error(w, "loan status invalid", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("loan status invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status)), http.StatusBadRequest)
 		return
 	}
 
-	// 6. get field validator employee by user id
-	fieldValidatorEmployee := helper.GetUserByUserID(approvalInfo.FieldValidatorEmployeeID)
-	if fieldValidatorEmployee.UserID == 0 {
-		log.Println("[InvestLoan] field validator employee data is not found")
-		http.Error(w, "field validator employee data is not found", http.StatusBadRequest)
+	// 6. get lender by user id
+	lender := helper.GetUserByUserID(lending.LenderID)
+	if lender.UserID == 0 {
+		log.Println("[InvestLoan] lender data is not found")
+		http.Error(w, "lender data is not found", http.StatusBadRequest)
 		return
 	}
 
-	// 7. check user status
-	if fieldValidatorEmployee.UserType != constant.UserTypeEmployee {
-		log.Println("[InvestLoan] user type is not field validator employee")
-		http.Error(w, "user type is not field validator employee", http.StatusBadRequest)
+	// 7. check user type
+	if lender.UserType != constant.UserTypeLender {
+		log.Println("[InvestLoan] user type is not lender")
+		http.Error(w, "user type is not lender", http.StatusBadRequest)
 		return
 	}
 
-	// 8. update loan status to approve
-	loan.Status = constant.LoanStatusApproved
-	loan.StatusDesc = constant.GetLoanStatusDesc(loan.Status)
-	loan.ApprovalInfo = &model.ApprovalInfo{
-		PictureProof:             approvalInfo.PictureProof,
-		FieldValidatorEmployeeID: approvalInfo.FieldValidatorEmployeeID,
-		ApprovalDate:             approvalInfo.ApprovalDate,
+	// 8. check invested amount
+	if lending.InvestedAmount > loan.GetRemainingRequiredAmount() {
+		log.Printf("[InvestLoan] invested amount is bigger than remaining required amount: %.2f", loan.GetRemainingRequiredAmount())
+		http.Error(w, fmt.Sprintf("invested amount is bigger than remaining required amount: %.2f", loan.GetRemainingRequiredAmount()), http.StatusBadRequest)
+		return
 	}
+
+	// 9. update loan lending data
+	if loan.IsLenderInvested(lender.UserID) {
+		for i := 0; i < len(loan.Lending); i++ {
+			if loan.Lending[i].LenderID == lender.UserID {
+				loan.Lending[i].InvestedAmount += lending.InvestedAmount
+				loan.Lending[i].ReturnAmount = loan.Lending[i].CalculateLenderReturnAmount(loan.InterestRate)
+			}
+		}
+	} else {
+		lendingdata := model.Lending{
+			LenderID:       lending.LenderID,
+			InvestedAmount: lending.InvestedAmount,
+		}
+		lendingdata.ReturnAmount = lendingdata.CalculateLenderReturnAmount(loan.InterestRate)
+		loan.Lending = append(loan.Lending, lendingdata)
+	}
+	loan.CollectedAmount += lending.InvestedAmount
+
+	// 10. check principal amount is fulfilled?
+	if loan.IsAmountFulfilled() {
+		// 10a. update loan status to invested
+		loan.Status = constant.LoanStatusInvested
+		loan.StatusDesc = constant.GetLoanStatusDesc(loan.Status)
+
+		// 10b. generate lender agreement pdf
+		err = helper.GenerateLenderAgreementPDF(&loan)
+		if err != nil {
+			log.Printf("[InvestLoan] fail to generate lender agreement pdf with error: %+v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 11. update loan lending
 	helper.UpsertLoan(loan)
 
-	// 9. return response
+	// 12. return response
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(loan)
 }
