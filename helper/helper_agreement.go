@@ -23,18 +23,18 @@ var (
 	agreements = make(map[int64]*model.Aggrement)
 )
 
-func GenerateIncrementalAgreementID() int64 {
+func (h *Helper) GenerateIncrementalAgreementID() int64 {
 	mutexAgreement.Lock()
 	defer mutexAgreement.Unlock()
 	agreementIDCounter++
 	return agreementIDCounter
 }
 
-func UpsertAgreement(agreement model.Aggrement) {
+func (h *Helper) UpsertAgreement(agreement model.Aggrement) {
 	agreements[agreement.AggrementID] = &agreement
 }
 
-func GetAgreements() []model.Aggrement {
+func (h *Helper) GetAgreements() []model.Aggrement {
 	var listAgreement []model.Aggrement
 	for _, v := range agreements {
 		listAgreement = append(listAgreement, *v)
@@ -43,7 +43,7 @@ func GetAgreements() []model.Aggrement {
 	return listAgreement
 }
 
-func GetAgreementByAgreementID(agreementID int64) model.Aggrement {
+func (h *Helper) GetAgreementByAgreementID(agreementID int64) model.Aggrement {
 	agreement, exists := agreements[agreementID]
 	if exists {
 		return *agreement
@@ -52,8 +52,8 @@ func GetAgreementByAgreementID(agreementID int64) model.Aggrement {
 	return model.Aggrement{}
 }
 
-func GenerateBorrowerAgreementPDF(loan *model.Loan) error {
-	borrower := GetUserByUserID(loan.BorrowerID)
+func (h *Helper) GenerateBorrowerAgreementPDF(loan *model.Loan) error {
+	borrower := h.GetUserByUserID(loan.BorrowerID)
 	if borrower.UserID == 0 {
 		log.Println("[GenerateAgreementPDF] borrower is not found")
 		return errors.New("borrower is not found")
@@ -85,27 +85,27 @@ func GenerateBorrowerAgreementPDF(loan *model.Loan) error {
 	}
 
 	organizerBorrowerAgreement := model.Aggrement{
-		AggrementID:  GenerateIncrementalAgreementID(),
+		AggrementID:  h.GenerateIncrementalAgreementID(),
 		DocumentData: base64.StdEncoding.EncodeToString(buf.Bytes()),
 		UserID:       borrower.UserID,
 	}
-	UpsertAgreement(organizerBorrowerAgreement)
+	h.UpsertAgreement(organizerBorrowerAgreement)
 
 	loan.OrganizerBorrowerAggrementURL = fmt.Sprintf(constant.AgreementPrefix, organizerBorrowerAgreement.AggrementID)
-	UpsertLoan(*loan)
+	h.UpsertLoan(*loan)
 
 	return nil
 }
 
-func GenerateLenderAgreementPDF(loan *model.Loan) error {
-	borrower := GetUserByUserID(loan.BorrowerID)
+func (h *Helper) GenerateLenderAgreementPDF(loan *model.Loan) error {
+	borrower := h.GetUserByUserID(loan.BorrowerID)
 	if borrower.UserID == 0 {
 		log.Println("[GenerateAgreementPDF] borrower is not found")
 		return errors.New("borrower is not found")
 	}
 
 	for i := 0; i < len(loan.Lending); i++ {
-		lender := GetUserByUserID(loan.Lending[i].LenderID)
+		lender := h.GetUserByUserID(loan.Lending[i].LenderID)
 		if lender.UserID == 0 {
 			log.Println("[GenerateAgreementPDF] lender is not found")
 			return errors.New("lender is not found")
@@ -143,24 +143,24 @@ func GenerateLenderAgreementPDF(loan *model.Loan) error {
 		}
 
 		organizerLenderAgreement := model.Aggrement{
-			AggrementID:  GenerateIncrementalAgreementID(),
+			AggrementID:  h.GenerateIncrementalAgreementID(),
 			DocumentData: base64.StdEncoding.EncodeToString(buf.Bytes()),
 			UserID:       lender.UserID,
 		}
-		UpsertAgreement(organizerLenderAgreement)
+		h.UpsertAgreement(organizerLenderAgreement)
 
 		loan.Lending[i].OrganizerLenderAggrementURL = fmt.Sprintf(constant.AgreementPrefix, organizerLenderAgreement.AggrementID)
 	}
 
-	UpsertLoan(*loan)
+	h.UpsertLoan(*loan)
 
 	return nil
 }
 
-func GenerateSignedAgreementPDF(loan *model.Loan, userID int64) error {
+func (h *Helper) GenerateSignedAgreementPDF(loan *model.Loan, userID int64) error {
 	tmpURL := ""
 
-	borrower := GetUserByUserID(loan.BorrowerID)
+	borrower := h.GetUserByUserID(loan.BorrowerID)
 	if borrower.UserID == 0 {
 		log.Println("[GenerateSignedAgreementPDF] borrower is not found")
 		return errors.New("borrower is not found")
@@ -194,19 +194,19 @@ func GenerateSignedAgreementPDF(loan *model.Loan, userID int64) error {
 		}
 
 		organizerBorrowerAgreement := model.Aggrement{
-			AggrementID:  GenerateIncrementalAgreementID(),
+			AggrementID:  h.GenerateIncrementalAgreementID(),
 			DocumentData: base64.StdEncoding.EncodeToString(buf.Bytes()),
 			UserID:       borrower.UserID,
 			IsSigned:     true,
 		}
-		UpsertAgreement(organizerBorrowerAgreement)
+		h.UpsertAgreement(organizerBorrowerAgreement)
 
 		tmpURL = fmt.Sprintf(constant.AgreementPrefix, organizerBorrowerAgreement.AggrementID)
 	} else {
 		// 2. organizer lender agreement
 		for i := 0; i < len(loan.Lending); i++ {
 			if userID == loan.Lending[i].LenderID {
-				lender := GetUserByUserID(loan.Lending[i].LenderID)
+				lender := h.GetUserByUserID(loan.Lending[i].LenderID)
 				if lender.UserID == 0 {
 					log.Println("[GenerateSignedAgreementPDF] lender is not found")
 					return errors.New("lender is not found")
@@ -244,12 +244,12 @@ func GenerateSignedAgreementPDF(loan *model.Loan, userID int64) error {
 				}
 
 				organizerLenderAgreement := model.Aggrement{
-					AggrementID:  GenerateIncrementalAgreementID(),
+					AggrementID:  h.GenerateIncrementalAgreementID(),
 					DocumentData: base64.StdEncoding.EncodeToString(buf.Bytes()),
 					UserID:       lender.UserID,
 					IsSigned:     true,
 				}
-				UpsertAgreement(organizerLenderAgreement)
+				h.UpsertAgreement(organizerLenderAgreement)
 
 				tmpURL = fmt.Sprintf(constant.AgreementPrefix, organizerLenderAgreement.AggrementID)
 			}
@@ -258,21 +258,21 @@ func GenerateSignedAgreementPDF(loan *model.Loan, userID int64) error {
 
 	if tmpURL != "" {
 		loan.DisbursementInfo.AgreementSignedURLs = append(loan.DisbursementInfo.AgreementSignedURLs, tmpURL)
-		UpsertLoan(*loan)
+		h.UpsertLoan(*loan)
 	}
 
 	return nil
 }
 
-func CheckAgreementCompletelySignedByLender(loan model.Loan) (bool, error) {
+func (h *Helper) CheckAgreementCompletelySignedByLender(loan model.Loan) (bool, error) {
 	for _, v := range loan.Lending {
-		organizerLenderAgreementID, err := GetAgreementIDByAgreementURL(v.OrganizerLenderAggrementURL)
+		organizerLenderAgreementID, err := h.GetAgreementIDByAgreementURL(v.OrganizerLenderAggrementURL)
 		if err != nil {
 			log.Printf("[CheckLoanCompletelySigned] failed get organizer-lender agreement id with error: %+v", err)
 			return false, err
 		}
 
-		organizerLenderAgreement := GetAgreementByAgreementID(organizerLenderAgreementID)
+		organizerLenderAgreement := h.GetAgreementByAgreementID(organizerLenderAgreementID)
 		if !organizerLenderAgreement.IsSigned {
 			log.Printf("[CheckLoanCompletelySigned] agremeent with agreement id: %d in loan id: %d is still unsigned", organizerLenderAgreement.AggrementID, loan.LoanID)
 			return false, nil
@@ -282,7 +282,7 @@ func CheckAgreementCompletelySignedByLender(loan model.Loan) (bool, error) {
 	return true, nil
 }
 
-func GetAgreementIDByAgreementURL(url string) (int64, error) {
+func (h *Helper) GetAgreementIDByAgreementURL(url string) (int64, error) {
 	parts := strings.Split(url, "/")
 	agreementIDString := parts[len(parts)-2]
 

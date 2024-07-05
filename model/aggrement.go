@@ -6,3 +6,8 @@ type Aggrement struct {
 	UserID       int64  `json:"user_id"`
 	IsSigned     bool   `json:"is_signed"`
 }
+
+type Sign struct {
+	LoanID int64 `json:"loan_id"`
+	UserID int64 `json:"user_id"`
+}
