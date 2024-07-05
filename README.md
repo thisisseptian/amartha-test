@@ -64,13 +64,13 @@ To test the flow, you can use Postman collection (in folder collection) to hit t
     - Get the agreement url using get loan list
     - URL format is like "http://localhost:8080/agreement/{agreement_id}/view"
     - The agreement URL can be clicked to display the PDF
-4. Hit Agreement Sign
+5. Hit Agreement Sign
     - Requires agreement_id, loan_id, and user_id
     - Each lender must sign their organizer-lender agreement URL
     - Once all lenders sign their agreements, the borrower receives the organizer-borrower agreement URL
     - The borrower must sign the organizer-borrower agreement URL for the loan status change to signed
     - The new signed agreement will be created
-5. Hit Loan Disburse
+6. Hit Loan Disburse
     - Loan status must be in signed (all users already signed the agreement (borrower & lender))
     - Requires field_officer_id, disbursement_date
     - Done, loan disbursed to borrower
