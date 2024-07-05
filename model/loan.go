@@ -6,6 +6,7 @@ import (
 
 type Loan struct {
 	LoanID                        int64            `json:"loan_id"`
+	TrxID                         int64            `json:"trx_id"`
 	BorrowerID                    int64            `json:"borrower_id"`
 	PrincipalAmount               float64          `json:"principal_amount"`
 	CollectedAmount               float64          `json:"collected_amount"`

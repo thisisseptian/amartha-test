@@ -6,205 +6,180 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"strconv"
+
+	"github.com/gorilla/mux"
 
 	"amartha-test/constant"
-	"amartha-test/helper"
 	"amartha-test/model"
 )
 
-// ListAgreement ...
-func ListAgreement(w http.ResponseWriter, r *http.Request) {
-	// 1. check http method
-	if r.Method != http.MethodGet {
-		log.Println("[ListAgreement] invalid request method")
-		http.Error(w, "invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// 2. get agreement list
-	agreements := helper.GetAgreements()
+// ListAgreement is handler to get list of agreements
+func (h *Handler) ListAgreement(w http.ResponseWriter, r *http.Request) {
+	// 1. get agreement list
+	agreements := h.Helper.GetAgreements()
 	if len(agreements) == 0 {
 		log.Println("[ListAgreement] agreement list is empty")
-		http.Error(w, "agreement list is empty", http.StatusNotFound)
+		h.RenderResponse(w, r, "", http.StatusNotFound, "[ListAgreement] agreement list is empty")
 		return
 	}
 
-	// 3. return response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(agreements)
+	// 2. render response
+	h.RenderResponse(w, r, agreements, http.StatusOK, "")
 }
 
-// DetailAgreement ...
-func DetailAgreement(w http.ResponseWriter, r *http.Request, agreementID int64) {
-	// 1. check http method
-	if r.Method != http.MethodGet {
-		log.Println("[DetailAgreement] invalid request method")
-		http.Error(w, "invalid request method", http.StatusMethodNotAllowed)
+// ViewAgreement is handler to view agreement detail
+func (h *Handler) ViewAgreement(w http.ResponseWriter, r *http.Request) {
+	// 1. get vars
+	vars := mux.Vars(r)
+	agreementID, err := strconv.ParseInt(vars["agreement_id"], 10, 64)
+	if err != nil {
+		log.Printf("[ViewAgreement] failed parse int, with error: %+v", err)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[ViewAgreement] failed parse int, with error: %+v", err))
 		return
 	}
 
-	// 2. get agreement by agreement id
-	agreement := helper.GetAgreementByAgreementID(agreementID)
+	// 2. sanitize payload
+	if agreementID == 0 {
+		log.Println("[ViewAgreement] agreement id is zero")
+		h.RenderResponse(w, r, "", http.StatusBadRequest, "[ViewAgreement] agreement id is zero")
+		return
+	}
+
+	// 3. get agreement by agreement id
+	agreement := h.Helper.GetAgreementByAgreementID(agreementID)
 	if agreement.AggrementID == 0 {
-		log.Println("[DetailAgreement] agreement data is not found")
-		http.Error(w, "agreement data is not found", http.StatusNotFound)
+		log.Printf("[ViewAgreement][AgreementID: %d] agreement data is not found", agreementID)
+		h.RenderResponse(w, r, "", http.StatusNotFound, fmt.Sprintf("[ViewAgreement][AgreementID: %d] agreement data is not found", agreementID))
 		return
 	}
 
-	// 3. decode agreement base 64
+	// 4. decode agreement base 64
 	pdfData, err := base64.StdEncoding.DecodeString(agreement.DocumentData)
 	if err != nil {
-		log.Printf("[DetailAgreement] failed to decode base64 pdf data with error: %+v", err)
-		http.Error(w, fmt.Sprintf("[DetailAgreement] failed to decode base64 pdf data with error: %+v", err), http.StatusInternalServerError)
+		log.Printf("[ViewAgreement][AgreementID: %d] failed to decode base64 pdf data with error: %+v", agreementID, err)
+		h.RenderResponse(w, r, "", http.StatusNotFound, fmt.Sprintf("[ViewAgreement][AgreementID: %d] failed to decode base64 pdf data with error: %+v", agreementID, err))
 		return
 	}
 
-	// 4. return response
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", "inline; filename=agreement.pdf")
-	w.WriteHeader(http.StatusOK)
-	w.Write(pdfData)
+	// 5. render response
+	h.RenderPDFResponse(w, pdfData, http.StatusOK)
 }
 
-// SignAgreement ...
-func SignAgreement(w http.ResponseWriter, r *http.Request, agreementID int64) {
-	// 1. check http method
-	if r.Method != http.MethodPost {
-		log.Println("[SignAgreement] invalid request method")
-		http.Error(w, "invalid request method", http.StatusMethodNotAllowed)
+// SignAgreement is handler to sign agreement
+func (h *Handler) SignAgreement(w http.ResponseWriter, r *http.Request) {
+	// 1. get vars
+	vars := mux.Vars(r)
+	agreementID, err := strconv.ParseInt(vars["agreement_id"], 10, 64)
+	if err != nil {
+		log.Printf("[SignAgreement] failed parse int, with error: %+v", err)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[SignAgreement] failed parse int, with error: %+v", err))
 		return
 	}
 
 	// 2. decode body
-	var disbursement model.Disbursement
-	err := json.NewDecoder(r.Body).Decode(&disbursement)
+	var sign model.Sign
+	err = json.NewDecoder(r.Body).Decode(&sign)
 	if err != nil {
-		log.Printf("[SignAgreement] fail decode body with error: %+v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("[SignAgreement][AgreementID: %d] fail decode body with error: %+v", agreementID, err)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[SignAgreement][AgreementID: %d] fail decode body with error: %+v", agreementID, err))
 		return
 	}
 
 	// 3. sanitize payload
-	if disbursement.LoanID == 0 {
-		log.Print("[SignAgreement] loan id is empty")
-		http.Error(w, "loan id is empty", http.StatusBadRequest)
+	if sign.LoanID == 0 {
+		log.Printf("[SignAgreement][AgreementID: %d] loan id is empty", agreementID)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[SignAgreement][AgreementID: %d] loan id is empty", agreementID))
 		return
 	}
-	if disbursement.UserID == 0 {
-		log.Print("[SignAgreement] user id is empty")
-		http.Error(w, "user id is empty", http.StatusBadRequest)
+	if sign.UserID == 0 {
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d] user id is empty", agreementID, sign.LoanID)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d] user id is empty", agreementID, sign.LoanID))
 		return
 	}
 
 	// 4. get loan by loan id
-	loan := helper.GetLoanByLoanID(disbursement.LoanID)
+	loan := h.Helper.GetLoanByLoanID(sign.LoanID)
 	if loan.LoanID == 0 {
-		log.Println("[SignAgreement] loan data not found")
-		http.Error(w, "loan data not found", http.StatusBadRequest)
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] loan data not found", agreementID, sign.LoanID, sign.UserID)
+		h.RenderResponse(w, r, "", http.StatusNotFound, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] loan data not found", agreementID, sign.LoanID, sign.UserID))
 		return
 	}
 
 	// 5. check loan status
 	if loan.Status != constant.LoanStatusInvested {
-		log.Printf("[SignAgreement] loan status invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status))
-		http.Error(w, fmt.Sprintf("loan status invalid, current status is: %s", constant.GetLoanStatusDesc(loan.Status)), http.StatusBadRequest)
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] loan status invalid, current status is: %s", agreementID, sign.LoanID, sign.UserID, constant.GetLoanStatusDesc(loan.Status))
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] loan status invalid, current status is: %s", agreementID, sign.LoanID, sign.UserID, constant.GetLoanStatusDesc(loan.Status)))
 		return
 	}
 
-	// 6. get agreement by agreement id
-	agreement := helper.GetAgreementByAgreementID(agreementID)
-	if agreement.AggrementID == 0 {
-		log.Println("[SignAgreement] agreement data not found")
-		http.Error(w, "agreement data not found", http.StatusBadRequest)
-		return
-	}
-
-	// 7. wrong user to sign
-	if agreement.UserID != disbursement.UserID {
-		log.Println("[SignAgreement] wrong user to sign this agreement")
-		http.Error(w, "wrong user to sign this agreement", http.StatusBadRequest)
-		return
-	}
-
-	// 8. check agreement sign
-	if agreement.IsSigned {
-		log.Println("[SignAgreement] agreement already signed")
-		http.Error(w, "agreement already signed", http.StatusBadRequest)
-		return
-	}
-
-	// 9. update agreement sign
-	agreement.IsSigned = true
-	helper.UpsertAgreement(agreement)
-
-	// 10. generate agreement sign pdf
-	err = helper.GenerateSignedAgreementPDF(&loan, disbursement.UserID)
-	if err != nil {
-		log.Printf("[SignAgreement] fail to generate signed agreement pdf with error: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// 11. get user by user id
-	user := helper.GetUserByUserID(disbursement.UserID)
+	// 6. get user by user id
+	user := h.Helper.GetUserByUserID(sign.UserID)
 	if user.UserID == 0 {
-		log.Println("[SignAgreement] user data not found")
-		http.Error(w, "user data not found", http.StatusBadRequest)
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] user data not found", agreementID, sign.LoanID, sign.UserID)
+		h.RenderResponse(w, r, "", http.StatusNotFound, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] user data not found", agreementID, sign.LoanID, sign.UserID))
+		return
+	}
+
+	// 7. get agreement by agreement id
+	agreement := h.Helper.GetAgreementByAgreementID(agreementID)
+	if agreement.AggrementID == 0 {
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] agreement data not found", agreementID, sign.LoanID, sign.UserID)
+		h.RenderResponse(w, r, "", http.StatusNotFound, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] agreement data not found", agreementID, sign.LoanID, sign.UserID))
+		return
+	}
+
+	// 8. wrong user to sign
+	if agreement.UserID != sign.UserID {
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] wrong user to sign this agreement", agreementID, sign.LoanID, sign.UserID)
+		h.RenderResponse(w, r, "", http.StatusForbidden, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] wrong user to sign this agreement", agreementID, sign.LoanID, sign.UserID))
+		return
+	}
+
+	// 9. check agreement sign
+	if agreement.IsSigned {
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] agreement already signed", agreementID, sign.LoanID, sign.UserID)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] agreement already signed", agreementID, sign.LoanID, sign.UserID))
+		return
+	}
+
+	// 10. update agreement sign
+	agreement.IsSigned = true
+	h.Helper.UpsertAgreement(agreement)
+
+	// 11. generate agreement sign pdf
+	err = h.Helper.GenerateSignedAgreementPDF(&loan, sign.UserID)
+	if err != nil {
+		log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] fail to generate signed agreement pdf with error: %+v", agreementID, sign.LoanID, sign.UserID, err)
+		h.RenderResponse(w, r, "", http.StatusInternalServerError, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] fail to generate signed agreement pdf with error: %+v", agreementID, sign.LoanID, sign.UserID, err))
 		return
 	}
 
 	// 12. check based on user type
 	if user.UserType == constant.UserTypeLender {
 		// 12a. check agreement is completely signed by all lender
-		isCompletelySignedByLender, err := helper.CheckAgreementCompletelySignedByLender(loan)
+		isCompletelySignedByLender, err := h.Helper.CheckAgreementCompletelySignedByLender(loan)
 		if err != nil {
-			log.Printf("[SignAgreement] check agreement completely signed by lender got fail with error: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] check agreement completely signed by lender got fail with error: %+v", agreementID, sign.LoanID, sign.UserID, err)
+			h.RenderResponse(w, r, "", http.StatusInternalServerError, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] check agreement completely signed by lender got fail with error: %+v", agreementID, sign.LoanID, sign.UserID, err))
 			return
 		}
 		if isCompletelySignedByLender {
 			// 12b. generate borrower agreement pdf
-			err = helper.GenerateBorrowerAgreementPDF(&loan)
+			err = h.Helper.GenerateBorrowerAgreementPDF(&loan)
 			if err != nil {
-				log.Printf("[SignAgreement] fail to generate borrower agreement pdf with error: %+v", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Printf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] fail to generate borrower agreement pdf with error: %+v", agreementID, sign.LoanID, sign.UserID, err)
+				h.RenderResponse(w, r, "", http.StatusInternalServerError, fmt.Sprintf("[SignAgreement][AgreementID: %d][LoanID: %d][UserID: %d] fail to generate borrower agreement pdf with error: %+v", agreementID, sign.LoanID, sign.UserID, err))
 				return
 			}
 		}
-	} else if user.UserType == constant.UserTypeBorrower { // final sign must be from borrower
-		// 12c. update loan disbursement and status
-		loan.Status = constant.LoanStatusDisbursed
+	} else if user.UserType == constant.UserTypeBorrower {
+		// 12c. if borrower sign, must be final sign, and move status to signed
+		loan.Status = constant.LoanStatusSigned
 		loan.StatusDesc = constant.GetLoanStatusDesc(loan.Status)
-		fieldOfficerID := disbursement.FieldOfficerID
-		if disbursement.FieldOfficerID != 0 {
-			// 12d. get field officer employee by user id
-			fieldOfficerEmployee := helper.GetUserByUserID(disbursement.FieldOfficerID)
-			if fieldOfficerEmployee.UserID == 0 {
-				if agreement.AggrementID == 0 {
-					// just log the error and continue with field officer employee id = 0
-					log.Println("[SignAgreement] field officer employee data not found")
-					fieldOfficerID = 0
-				}
-			}
-
-			// 12e. check user type
-			if fieldOfficerEmployee.UserType != constant.UserTypeFieldOfficerEmployee {
-				// just log the error and continue with field officer employee id = 0
-				log.Println("[SignAgreement] user type is not field officer employee")
-				fieldOfficerID = 0
-			}
-		}
-		loan.DisbursementInfo.FieldOfficerID = fieldOfficerID
-		disbursementDate := disbursement.DisbursementDate
-		if disbursement.DisbursementDate.IsZero() {
-			disbursementDate = time.Now()
-		}
-		loan.DisbursementInfo.DisbursementDate = disbursementDate
-		helper.UpsertLoan(loan)
+		h.Helper.UpsertLoan(loan)
 	}
 
-	// 12. return response
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(loan)
+	// 13. render response
+	h.RenderResponse(w, r, loan, http.StatusOK, "")
 }

@@ -1,98 +1,45 @@
 package main
 
 import (
-	"amartha-test/handler"
-	"amartha-test/helper"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
+
+	"github.com/gorilla/mux"
+
+	hand "amartha-test/handler"
+	help "amartha-test/helper"
 )
 
-func dynamicLoanRouteHandler(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	if strings.HasPrefix(path, "/loan/") {
-		path = strings.TrimPrefix(path, "/loan/")
-		parts := strings.Split(path, "/")
-		if len(parts) >= 2 {
-			loanID, err := strconv.ParseInt(parts[0], 10, 64)
-			if err != nil {
-				http.Error(w, "invalid loan id", http.StatusBadRequest)
-				return
-			}
-
-			if loanID == 0 {
-				http.Error(w, "loan id is empty", http.StatusBadRequest)
-				return
-			}
-
-			action := parts[1]
-			switch action {
-			case "detail":
-				handler.DetailLoan(w, r, loanID)
-			case "approve":
-				handler.ApproveLoan(w, r, loanID)
-			case "invest":
-				handler.InvestLoan(w, r, loanID)
-			// case "disburse":
-			// 	disburseLoan(w, r, id)
-			default:
-				http.Error(w, "invalid action", http.StatusBadRequest)
-			}
-			return
-		}
-	}
-
-	http.NotFound(w, r)
-}
-
-func dynamicAgreementRouterHandler(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	if strings.HasPrefix(path, "/agreement/") {
-		path = strings.TrimPrefix(path, "/agreement/")
-		parts := strings.Split(path, "/")
-		if len(parts) >= 1 {
-			agreementID, err := strconv.ParseInt(parts[0], 10, 64)
-			if err != nil {
-				http.Error(w, "invalid agreement id", http.StatusBadRequest)
-				return
-			}
-
-			if agreementID == 0 {
-				http.Error(w, "agreement id is empty", http.StatusBadRequest)
-				return
-			}
-
-			action := parts[1]
-			switch action {
-			case "view":
-				handler.DetailAgreement(w, r, agreementID)
-			case "sign":
-				handler.SignAgreement(w, r, agreementID)
-			default:
-				http.Error(w, "invalid action", http.StatusBadRequest)
-			}
-			return
-		}
-	}
-
-	http.NotFound(w, r)
-}
-
 func main() {
-	// route user
+	// init helper
+	helper := help.NewHelper()
 	helper.InitUsers()
-	http.HandleFunc("/user/list", handler.ListUser)
 
-	// route loan
-	http.HandleFunc("/loan/list", handler.ListLoan)
-	http.HandleFunc("/loan/create", handler.SubmitLoan)
-	http.HandleFunc("/loan/", dynamicLoanRouteHandler)
+	// init handler
+	handler := &hand.Handler{
+		Helper: helper,
+	}
 
-	// route agreement
-	http.HandleFunc("/agreement/list", handler.ListAgreement)
-	http.HandleFunc("/agreement/", dynamicAgreementRouterHandler)
+	// init router
+	router := mux.NewRouter()
+
+	// list of user routes
+	router.HandleFunc("/user/list", handler.Middleware(handler.ListUser)).Methods("GET")
+	router.HandleFunc("/user/{user_id}/detail", handler.Middleware(handler.DetailUser)).Methods("GET")
+
+	// list of loan routes
+	router.HandleFunc("/loan/list", handler.Middleware(handler.ListLoan)).Methods("GET")
+	router.HandleFunc("/loan/{loan_id}/detail", handler.Middleware(handler.DetailLoan)).Methods("GET")
+	router.HandleFunc("/loan/submit", handler.Middleware(handler.SubmitLoan)).Methods("POST")
+	router.HandleFunc("/loan/{loan_id}/approve", handler.Middleware(handler.ApproveLoan)).Methods("POST")
+	router.HandleFunc("/loan/{loan_id}/invest", handler.Middleware(handler.InvestLoan)).Methods("POST")
+	router.HandleFunc("/loan/{loan_id}/disburse", handler.Middleware(handler.DisburseLoan)).Methods("POST")
+
+	// list of agreement routes
+	router.HandleFunc("/agreement/list", handler.Middleware(handler.ListAgreement)).Methods("GET")
+	router.HandleFunc("/agreement/{agreement_id}/view", handler.Middleware(handler.ViewAgreement)).Methods("GET")
+	router.HandleFunc("/agreement/{agreement_id}/sign", handler.Middleware(handler.SignAgreement)).Methods("POST")
 
 	fmt.Println("listening server on port :8080")
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", router)
 }

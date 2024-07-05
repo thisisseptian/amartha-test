@@ -1,31 +1,54 @@
 package handler
 
 import (
-	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
-	"amartha-test/helper"
+	"github.com/gorilla/mux"
 )
 
-// ListUser ...
-func ListUser(w http.ResponseWriter, r *http.Request) {
-	// 1. check http method
-	if r.Method != http.MethodGet {
-		log.Println("[ListUser] invalid request method")
-		http.Error(w, "invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// 2. get user list
-	users := helper.GetUsers()
+// ListUser is handler to get list of users
+func (h *Handler) ListUser(w http.ResponseWriter, r *http.Request) {
+	// 1. get user list
+	users := h.Helper.GetUsers()
 	if len(users) == 0 {
 		log.Println("[ListUser] user list is empty")
-		http.Error(w, "user list is empty", http.StatusNotFound)
+		h.RenderResponse(w, r, "", http.StatusNotFound, "[ListUser] user list is empty")
 		return
 	}
 
-	// 3. return response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(users)
+	// 2. render response
+	h.RenderResponse(w, r, users, http.StatusOK, "")
+}
+
+// DetailUser is handler to get user detail
+func (h *Handler) DetailUser(w http.ResponseWriter, r *http.Request) {
+	// 1. get vars
+	vars := mux.Vars(r)
+	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
+	if err != nil {
+		log.Printf("[DetailUser] failed parse int, with error: %+v", err)
+		h.RenderResponse(w, r, "", http.StatusBadRequest, fmt.Sprintf("[DetailUser] failed parse int, with error: %+v", err))
+		return
+	}
+
+	// 2. sanitize payload
+	if userID == 0 {
+		log.Println("[DetailUser] user id is zero")
+		h.RenderResponse(w, r, "", http.StatusBadRequest, "[DetailUser] user id is zero")
+		return
+	}
+
+	// 3. get user by user id
+	user := h.Helper.GetUserByUserID(userID)
+	if user.UserID == 0 {
+		log.Printf("[DetailUser][UserID: %d] user data is not found", userID)
+		h.RenderResponse(w, r, "", http.StatusNotFound, fmt.Sprintf("[DetailUser][UserID: %d] user data is not found", userID))
+		return
+	}
+
+	// 4. render response
+	h.RenderResponse(w, r, user, http.StatusOK, "")
 }

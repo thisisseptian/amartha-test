@@ -1,8 +1,9 @@
 package helper
 
 import (
-	"amartha-test/model"
 	"sync"
+
+	"amartha-test/model"
 )
 
 var (
@@ -12,18 +13,18 @@ var (
 	loans = make(map[int64]*model.Loan)
 )
 
-func GenerateIncrementalLoanID() int64 {
+func (h *Helper) GenerateIncrementalLoanID() int64 {
 	mutexLoan.Lock()
 	defer mutexLoan.Unlock()
 	loanIDCounter++
 	return loanIDCounter
 }
 
-func UpsertLoan(loan model.Loan) {
+func (h *Helper) UpsertLoan(loan model.Loan) {
 	loans[loan.LoanID] = &loan
 }
 
-func GetLoans() []model.Loan {
+func (h *Helper) GetLoans() []model.Loan {
 	var listLoan []model.Loan
 	for _, v := range loans {
 		listLoan = append(listLoan, *v)
@@ -32,7 +33,7 @@ func GetLoans() []model.Loan {
 	return listLoan
 }
 
-func GetLoanByLoanID(loanID int64) model.Loan {
+func (h *Helper) GetLoanByLoanID(loanID int64) model.Loan {
 	loan, exists := loans[loanID]
 	if exists {
 		return *loan
