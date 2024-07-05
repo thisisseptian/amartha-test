@@ -180,7 +180,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"lender_id\": 2,\r\n    \"invested_amount\": 1500000\r\n}",
+							"raw": "{\r\n    \"lender_id\": 3,\r\n    \"invested_amount\": 500000\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -188,7 +188,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/loan/2/invest",
+							"raw": "http://localhost:8080/loan/1/invest",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -196,7 +196,7 @@
 							"port": "8080",
 							"path": [
 								"loan",
-								"2",
+								"1",
 								"invest"
 							]
 						}
@@ -285,7 +285,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/agreement/7/sign",
+							"raw": "http://localhost:8080/agreement/5/sign",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -293,7 +293,7 @@
 							"port": "8080",
 							"path": [
 								"agreement",
-								"7",
+								"5",
 								"sign"
 							]
 						}
